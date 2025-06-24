@@ -1,5 +1,6 @@
+rival-regions-wrapper==1.3.3
 python-telegram-bot==13.15
-requests==2.31.0
-beautifulsoup4==4.12.3
+requests
+beautifulsoup4
 urllib3==1.26.16
 cfscrape==2.1.1
