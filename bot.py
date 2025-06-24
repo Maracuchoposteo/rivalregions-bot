@@ -6,8 +6,8 @@ from telegram import Bot
 from telegram.error import TelegramError
 
 # === CONFIGURACIÓN ===
-BOT_TOKEN = "TU_TOKEN_AQUÍ"
-USER_ID = TU_USER_ID_AQUÍ  # sin comillas si es número
+BOT_TOKEN = "os.environ.get("BOT_TOKEN")"
+USER_ID = int(os.environ.get("USER_ID"))  # sin comillas si es número
 BLOQUE_ID = 2148  # ID del bloque a monitorear
 CHECK_INTERVAL = 3600  # 1 hora
 
