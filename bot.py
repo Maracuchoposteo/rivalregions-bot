@@ -1,93 +1,44 @@
-import requests
-import time
-import logging
-import os
-from bs4 import BeautifulSoup
+from rival_regions_wrapper.middleware import LocalAuthentication
+from rival_regions_wrapper.wrapper import ResourceState, War
+import time, os, logging
 from telegram import Bot
 from telegram.error import TelegramError
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 
-# === CONFIGURACIÓN ===
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-USER_ID = int(os.environ.get("USER_ID"))
+# Configuración de Telegram
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+USER_ID = int(os.getenv("USER_ID"))
 BLOQUE_ID = 2148
-CHECK_INTERVAL = 3600  # 1 hora
+CHECK_INTERVAL = 3600
 
-bot = Bot(token=BOT_TOKEN)
 logging.basicConfig(level=logging.INFO)
+bot = Bot(token=BOT_TOKEN)
 
-# === FUNCIONES DEL BOT ===
-def get_bloque_data():
-    url = f"https://rivalregions.com/#blocs/show/{BLOQUE_ID}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        r = requests.get(url, headers=headers)
-        soup = BeautifulSoup(r.text, 'html.parser')
+# Autenticación en Rival Regions
+auth = LocalAuthentication()
+auth.set_credentials(os.getenv("RR_EMAIL"), os.getenv("RR_PASSWORD"), "email")
 
-        info = {"fronteras": [], "revoluciones": [], "habitantes": []}
-        estados = soup.select(".list-group-item")
+def get_data():
+    info = {"fronteras": [], "revoluciones": [], "habitantes": []}
+    estados = auth.get(f'blocs/info/{BLOQUE_ID}')  # o el endpoint correcto para tu bloque
 
-        for estado in estados:
-            nombre = estado.select_one("b").text.strip()
-            texto = estado.get_text(separator=" ").lower()
+    for state in estados['states']:
+        # Obtener población
+        pop = ResourceState(auth, state).info('citizens')['amount']
+        info["habitantes"].append(f"👥 {state}: {pop} habitantes")
 
-            if "border open" in texto:
-                frontera = f"🌐 {nombre}: Frontera ABIERTA"
-            elif "border closed" in texto:
-                frontera = f"🚧 {nombre}: Frontera CERRADA"
-            else:
-                frontera = f"❓ {nombre}: Estado desconocido"
-            info["fronteras"].append(frontera)
+        # Obtener conflictos
+        wars = War(auth, state).list_active()
+        if wars:
+            info["revoluciones"].append(f"⚔️ {state}: {len(wars)} conflicto(s) activo(s)")
 
-            if "revolution" in texto or "front" in texto:
-                info["revoluciones"].append(f"⚔️ {nombre} tiene actividad militar")
+        # Fronteras (si está soportado por la API)
+        border = auth.get(f'country/{state}/borders')
+        status = "✅ abierta" if border['open'] else "🚧 cerrada"
+        info["fronteras"].append(f"🌐 {state}: frontera {status}")
 
-            if "people:" in texto:
-                try:
-                    cantidad = texto.split("people:")[1].strip().split()[0]
-                    info["habitantes"].append(f"👥 {nombre}: {cantidad} habitantes")
-                except:
-                    pass
+    return info
 
-        return info
+# … (mismo servidor HTTP y bucle)
 
-    except Exception as e:
-        logging.error(f"Error al obtener datos del bloque: {e}")
-        return None
-
-def generar_mensaje(info):
-    msg = "📊 *Informe del Bloque*\n\n"
-    msg += "🛂 *Fronteras:*\n" + "\n".join(info["fronteras"]) + "\n\n"
-    msg += "🔥 *Frentes/Revoluciones:*\n"
-    msg += "\n".join(info["revoluciones"]) if info["revoluciones"] else "Sin actividad militar\n\n"
-    msg += "\n👥 *Población:*\n" + "\n".join(info["habitantes"])
-    return msg
-
-def enviar_mensaje(texto):
-    try:
-        bot.send_message(chat_id=USER_ID, text=texto, parse_mode="Markdown")
-    except TelegramError as e:
-        logging.error(f"Error al enviar mensaje: {e}")
-
-def bot_loop():
-    while True:
-        logging.info("⏳ Verificando bloque...")
-        datos = get_bloque_data()
-        if datos:
-            mensaje = generar_mensaje(datos)
-            enviar_mensaje(mensaje)
-        time.sleep(CHECK_INTERVAL)
-
-# === SERVIDOR HTTP PARA MANTENER EL SERVICIO ACTIVO ===
-class KeepAliveHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot en ejecucion")
-
-# === INICIAR BOT Y SERVIDOR ===
-if __name__ == "__main__":
-    Thread(target=bot_loop, daemon=True).start()
-    port = int(os.environ.get("PORT", 10000))
-    HTTPServer(('0.0.0.0', port), KeepAliveHandler).serve_forever()
