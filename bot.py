@@ -5,6 +5,8 @@ import os
 from bs4 import BeautifulSoup
 from telegram import Bot
 from telegram.error import TelegramError
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from threading import Thread
 
 # === CONFIGURACIÓN ===
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -12,12 +14,10 @@ USER_ID = int(os.environ.get("USER_ID"))
 BLOQUE_ID = 2148
 CHECK_INTERVAL = 3600  # 1 hora
 
-# === INICIAR LOGGING ===
-logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
+logging.basicConfig(level=logging.INFO)
 
-# === FUNCIONES ===
-
+# === FUNCIONES DEL BOT ===
 def get_bloque_data():
     url = f"https://m.rivalregions.com/#blocs/show/{BLOQUE_ID}"
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -32,7 +32,6 @@ def get_bloque_data():
             nombre = estado.select_one("b").text.strip()
             texto = estado.get_text(separator=" ").lower()
 
-            # Fronteras
             if "border open" in texto:
                 frontera = f"🌐 {nombre}: Frontera ABIERTA"
             elif "border closed" in texto:
@@ -41,11 +40,9 @@ def get_bloque_data():
                 frontera = f"❓ {nombre}: Estado desconocido"
             info["fronteras"].append(frontera)
 
-            # Revoluciones / Frentes
             if "revolution" in texto or "front" in texto:
                 info["revoluciones"].append(f"⚔️ {nombre} tiene actividad militar")
 
-            # Habitantes
             if "people:" in texto:
                 try:
                     cantidad = texto.split("people:")[1].strip().split()[0]
@@ -73,9 +70,7 @@ def enviar_mensaje(texto):
     except TelegramError as e:
         logging.error(f"Error al enviar mensaje: {e}")
 
-# === BUCLE PRINCIPAL ===
-
-if __name__ == "__main__":
+def bot_loop():
     while True:
         logging.info("⏳ Verificando bloque...")
         datos = get_bloque_data()
@@ -83,4 +78,15 @@ if __name__ == "__main__":
             mensaje = generar_mensaje(datos)
             enviar_mensaje(mensaje)
         time.sleep(CHECK_INTERVAL)
-        
+
+# === SERVIDOR HTTP PARA MANTENER EL SERVICIO ACTIVO ===
+class KeepAliveHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot en ejecucion")
+
+# === INICIAR BOT Y SERVIDOR ===
+if __name__ == "__main__":
+    Thread(target=bot_loop, daemon=True).start()
+    HTTPServer(('0.0.0.0', 10000), KeepAliveHandler).serve_forever()
