@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 
 # === FUNCIONES DEL BOT ===
 def get_bloque_data():
-    url = f"https://m.rivalregions.com/#blocs/show/{BLOQUE_ID}"
+    url = f"https://rivalregions.com/#blocs/show/{BLOQUE_ID}"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
         r = requests.get(url, headers=headers)
