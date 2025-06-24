@@ -89,4 +89,5 @@ class KeepAliveHandler(BaseHTTPRequestHandler):
 # === INICIAR BOT Y SERVIDOR ===
 if __name__ == "__main__":
     Thread(target=bot_loop, daemon=True).start()
-    HTTPServer(('0.0.0.0', 10000), KeepAliveHandler).serve_forever()
+    port = int(os.environ.get("PORT", 10000))
+    HTTPServer(('0.0.0.0', port), KeepAliveHandler).serve_forever()
