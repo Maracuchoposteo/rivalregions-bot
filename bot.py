@@ -1,14 +1,15 @@
 import requests
 import time
 import logging
+import os
 from bs4 import BeautifulSoup
 from telegram import Bot
 from telegram.error import TelegramError
 
 # === CONFIGURACIÓN ===
-BOT_TOKEN = "os.environ.get(7960061018:AAFbA3DQOCVV5naImpj0mX8LVq1koLQ4rHI)"
-USER_ID = int(os.environ.get(5239354695))  # sin comillas si es número
-BLOQUE_ID = 2148  # ID del bloque a monitorear
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+USER_ID = int(os.environ.get("USER_ID"))
+BLOQUE_ID = 2148
 CHECK_INTERVAL = 3600  # 1 hora
 
 # === INICIAR LOGGING ===
@@ -82,4 +83,4 @@ if __name__ == "__main__":
             mensaje = generar_mensaje(datos)
             enviar_mensaje(mensaje)
         time.sleep(CHECK_INTERVAL)
-          
+        
